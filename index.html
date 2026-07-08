@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Радар Политех Авиа ✈️</title>
+    <!-- Подключаем библиотеки с CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/papaparse@5.3.2/papaparse.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        body {
+            background-color: #0b132b; /* Цвет ночного неба */
+            color: #c5c6c7;
+            font-family: 'Courier New', monospace; /* Шрифт как на табло */
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+            margin: 0;
+        }
+        h1 { color: #39ff14; text-shadow: 0 0 10px #39ff14; } /* Неоновый зеленый */
+        .radar-container {
+            width: 80%;
+            height: 70%;
+            background: rgba(16, 32, 64, 0.8);
+            border: 2px solid #39ff14;
+            border-radius: 15px;
+            padding: 20px;
+            box-shadow: 0 0 20px rgba(57, 255, 20, 0.3);
+        }
+    </style>
+</head>
+<body>
+
+    <h1>📡 РАДАР ДИСПЕТЧЕРСКОЙ ПОЛИТЕХ АВИА 📡</h1>
+    <div class="radar-container">
+        <canvas id="flightRadar"></canvas>
+    </div>
+
+    <script>
+        // СЮДА ВСТАВЬ ССЫЛКУ НА СВОЮ ОПУБЛИКОВАННУЮ CSV ТАБЛИЦУ
+        const SHEET_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vQhlYU2RB6wpIzFS709BcVHZCEcRtL8ZIQjykgTiNOOBiynDuAfRoyo2t4F5aOE6-tQmVMhqlv2Lo8f/pub?gid=2078528736&single=true&output=csv';
+
+        // Цвета для команд (неоновые, чтобы было видно на темном фоне)
+        const teamColors = ['#ff0055', '#00ffaa', '#ffcc00', '#ff6600', '#aa00ff', '#00ccff'];
+
+        Papa.parse(SHEET_URL, {
+            download: true,
+            header: true,
+            complete: function(results) {
+                const data = results.data;
+                const rounds = data.map(row => row['Раунд']); // Убедись, что заголовок столбца точно "Раунд"
+                
+                const datasets = [];
+                const headers = Object.keys(data[0]);
+
+                // Проходимся по всем командам (столбцам)
+                headers.forEach((header, index) => {
+                    if (header !== 'Раунд') {
+                        datasets.push({
+                            label: header,
+                            data: data.map(row => row[header]),
+                            borderColor: teamColors[index % teamColors.length],
+                            backgroundColor: teamColors[index % teamColors.length],
+                            borderWidth: 3,
+                            tension: 0.3, // Делаем линии плавными, как дуги полёта
+                            pointStyle: '✈️', // Эмодзи самолётика вместо точек!
+                            pointRadius: 15,
+                            pointHoverRadius: 20
+                        });
+                    }
+                });
+
+                // Рисуем график
+                const ctx = document.getElementById('flightRadar').getContext('2d');
+                new Chart(ctx, {
+                    type: 'line',
+                    data: { labels: rounds, datasets: datasets },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: {
+                            legend: { labels: { color: '#fff', font: { size: 16 } } },
+                            tooltip: {
+                                callbacks: {
+                                    label: function(context) {
+                                        return `${context.dataset.label}: ${context.parsed.y} миль`;
+                                    }
+                                }
+                            }
+                        },
+                        scales: {
+                            x: { 
+                                title: { display: true, text: 'ЭТАПЫ ПОЛЁТА', color: '#39ff14' },
+                                ticks: { color: '#fff' },
+                                grid: { color: 'rgba(255,255,255,0.1)' }
+                            },
+                            y: { 
+                                title: { display: true, text: 'МИЛИ', color: '#39ff14' },
+                                ticks: { color: '#fff' },
+                                grid: { color: 'rgba(255,255,255,0.1)' }
+                            }
+                        }
+                    }
+                });
+            }
+        });
+    </script>
+</body>
+</html>
