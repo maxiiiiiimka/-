@@ -65,7 +65,21 @@
                 // Для каждой команды создаём dataset
                 teamNames.forEach((teamName, teamIndex) => {
                     const rowData = data[teamIndex + 1]; // +1 потому что первая строка - заголовки
-                    const points = rowData.slice(1).map(p => parseInt(p) || 0);
+                    
+                    // Преобразуем данные: если FALSE — то null (линия прерывается)
+                    const points = rowData.slice(1).map(p => {
+                        // Проверяем на FALSE (может быть как строкой, так и булевым)
+                        if (p === 'FALSE' || p === false || p === 'false') {
+                            return null; // null = линия прерывается
+                        }
+                        // Если пустая ячейка или не число — тоже null
+                        if (p === '' || p === null || p === undefined) {
+                            return null;
+                        }
+                        // Иначе пытаемся распарсить число
+                        const num = parseInt(p);
+                        return isNaN(num) ? null : num;
+                    });
                     
                     datasets.push({
                         label: teamName,
@@ -73,10 +87,11 @@
                         borderColor: teamColors[teamIndex % teamColors.length],
                         backgroundColor: teamColors[teamIndex % teamColors.length],
                         borderWidth: 3,
-                        tension: 0.3,
+                        tension: 0.3, // Плавные линии
                         pointStyle: '✈️',
                         pointRadius: 15,
                         pointHoverRadius: 20
+                        // spanGaps не указан = false по умолчанию, линия прерывается на null
                     });
                 });
 
@@ -100,6 +115,9 @@
                             tooltip: {
                                 callbacks: {
                                     label: function(context) {
+                                        if (context.parsed.y === null) {
+                                            return `${context.dataset.label}: раунд не проводился`;
+                                        }
                                         return `${context.dataset.label}: ${context.parsed.y} миль`;
                                     }
                                 }
