@@ -17,11 +17,13 @@
             justify-content: center;
             height: 100vh;
             margin: 0;
+            padding: 0;
         }
         h1 { 
             color: #39ff14; 
             text-shadow: 0 0 10px #39ff14;
             margin-bottom: 10px;
+            text-align: center;
         }
         .status {
             color: #00ffaa;
@@ -67,13 +69,12 @@
     </div>
 
     <script>
-        // ВСТАВЬ СЮДА СВОЙ URL от Apps Script
+        // ВСТАВЬ СЮДА СВОЙ URL от Apps Script (заканчивается на /exec)
         const SHEET_URL = 'https://script.google.com/macros/s/AKfycbwIGfyTWa57OnwkoKUybErKuvIRpNJerQ929a4VdKcC08mBQ1frwJmbPH4JbbPeYwSvUg/exec';
 
         const teamColors = ['#ff0055', '#00ffaa', '#ffcc00', '#ff6600', '#aa00ff', '#00ccff', '#ff3399', '#33ff99'];
         
         let chartInstance = null;
-        let lastUpdate = null;
 
         function loadRadarData() {
             const statusText = document.getElementById('statusText');
@@ -83,23 +84,50 @@
                 download: true,
                 header: false,
                 complete: function(results) {
+                    console.log('Данные загружены:', results.data);
+                    
                     const data = results.data;
                     
-                    const rounds = data[0].slice(1).filter(r => r);
-                    const teamNames = data.slice(1).map(row => row[0]).filter(t => t);
+                    // Проверяем что данные не пустые
+                    if (!data || data.length === 0) {
+                        statusText.textContent = '⚠ Таблица пуста!';
+                        return;
+                    }
+                    
+                    // Первая строка = названия раундов (пропускаем первую пустую ячейку)
+                    const rounds = data[0].slice(1).filter(r => r && r.toString().trim() !== '');
+                    
+                    // Первая колонка = названия команд (пропускаем первую строку с заголовками)
+                    const teamNames = data.slice(1).map(row => row[0]).filter(t => t && t.toString().trim() !== '');
+                    
+                    console.log('Раунды:', rounds);
+                    console.log('Команды:', teamNames);
+                    
+                    if (rounds.length === 0 || teamNames.length === 0) {
+                        statusText.textContent = '⚠ Ошибка: нет данных о раундах или командах';
+                        return;
+                    }
                     
                     const datasets = [];
                     
                     teamNames.forEach((teamName, teamIndex) => {
                         const rowData = data[teamIndex + 1];
                         
+                        if (!rowData) {
+                            console.warn('Нет данных для команды:', teamName);
+                            return;
+                        }
+                        
                         const points = rowData.slice(1).map(p => {
-                            if (p === 'FALSE' || p === false || p === 'false') {
+                            // Проверяем на FALSE
+                            if (p === 'FALSE' || p === false || p === 'false' || p === 'ЛОЖЬ') {
                                 return null;
                             }
+                            // Если пустая ячейка
                             if (p === '' || p === null || p === undefined) {
                                 return null;
                             }
+                            // Пытаемся распарсить число
                             const num = parseInt(p);
                             return isNaN(num) ? null : num;
                         });
@@ -117,6 +145,7 @@
                         });
                     });
 
+                    // Удаляем старый график
                     if (chartInstance) {
                         chartInstance.destroy();
                     }
@@ -165,21 +194,20 @@
                         }
                     });
 
-                    lastUpdate = new Date();
-                    const timeStr = lastUpdate.toLocaleTimeString('ru-RU');
-                    statusText.textContent = `Радар активен | Обновлено: ${timeStr} | Автообновление каждые 10 сек`;
+                    const timeStr = new Date().toLocaleTimeString('ru-RU');
+                    statusText.textContent = `✓ Радар активен | Обновлено: ${timeStr}`;
                 },
                 error: function(error) {
                     console.error('Ошибка загрузки данных:', error);
-                    statusText.textContent = ' Ошибка связи с радаром. Повтор через 10 сек...';
+                    statusText.textContent = ' Ошибка связи с радаром. Проверьте консоль (F12)';
                 }
             });
         }
 
-        // Первый запуск сразу
+        // Первый запуск
         loadRadarData();
 
-        // Автообновление каждые 10 секунд (теперь можно чаще, так как Apps Script быстрый)
+        // Автообновление каждые 10 секунд
         setInterval(loadRadarData, 10000);
     </script>
 </body>
