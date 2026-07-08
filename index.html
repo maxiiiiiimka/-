@@ -67,12 +67,13 @@
     </div>
 
     <script>
-        const SHEET_URL = 'https://corsproxy.io/?' + encodeURIComponent('https://docs.google.com/spreadsheets/d/e/2PACX-1vQhlYU2RB6wpIzFS709BcVHZCEcRtL8ZIQjykgTiNOOBiynDuAfRoyo2t4F5aOE6-tQmVMhqlv2Lo8f/pub?gid=2078528736&single=true&output=csv');
+        // ВСТАВЬ СЮДА СВОЙ URL от Apps Script
+        const SHEET_URL = 'https://script.google.com/macros/s/AKfycbxivfXnnlgGefqfzKBLad5BTH_uZSr-SEIoJfIPqkHgwMHsrVq5zAEndzxuXmoqcg080A/exec';
 
         const teamColors = ['#ff0055', '#00ffaa', '#ffcc00', '#ff6600', '#aa00ff', '#00ccff', '#ff3399', '#33ff99'];
         
-        let chartInstance = null; // Храним ссылку на график
-        let lastUpdate = null;    // Время последнего обновления
+        let chartInstance = null;
+        let lastUpdate = null;
 
         function loadRadarData() {
             const statusText = document.getElementById('statusText');
@@ -110,13 +111,12 @@
                             backgroundColor: teamColors[teamIndex % teamColors.length],
                             borderWidth: 3,
                             tension: 0.3,
-                            pointStyle: '️',
+                            pointStyle: '✈️',
                             pointRadius: 15,
                             pointHoverRadius: 20
                         });
                     });
 
-                    // Удаляем старый график перед отрисовкой нового
                     if (chartInstance) {
                         chartInstance.destroy();
                     }
@@ -165,23 +165,22 @@
                         }
                     });
 
-                    // Обновляем статус
                     lastUpdate = new Date();
                     const timeStr = lastUpdate.toLocaleTimeString('ru-RU');
-                    statusText.textContent = `Радар активен | Обновлено: ${timeStr} | Следующее сканирование через 30 сек`;
+                    statusText.textContent = `Радар активен | Обновлено: ${timeStr} | Автообновление каждые 10 сек`;
                 },
                 error: function(error) {
                     console.error('Ошибка загрузки данных:', error);
-                    statusText.textContent = '⚠ Ошибка связи с радаром. Повтор через 30 сек...';
+                    statusText.textContent = ' Ошибка связи с радаром. Повтор через 10 сек...';
                 }
             });
         }
 
-        // Первый запуск
+        // Первый запуск сразу
         loadRadarData();
 
-        // Автообновление каждые 30 секунд
-        setInterval(loadRadarData, 30000);
+        // Автообновление каждые 10 секунд (теперь можно чаще, так как Apps Script быстрый)
+        setInterval(loadRadarData, 10000);
     </script>
 </body>
 </html>
