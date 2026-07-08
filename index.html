@@ -19,10 +19,15 @@
             height: 100vh;
             margin: 0;
         }
-        h1 { color: #39ff14; text-shadow: 0 0 10px #39ff14; } /* Неоновый зеленый */
+        h1 { 
+            color: #39ff14; 
+            text-shadow: 0 0 10px #39ff14;
+            margin-bottom: 20px;
+        }
         .radar-container {
-            width: 80%;
-            height: 70%;
+            width: 90%;
+            max-width: 1200px;
+            height: 70vh;
             background: rgba(16, 32, 64, 0.8);
             border: 2px solid #39ff14;
             border-radius: 15px;
@@ -39,50 +44,59 @@
     </div>
 
     <script>
-        // СЮДА ВСТАВЬ ССЫЛКУ НА СВОЮ ОПУБЛИКОВАННУЮ CSV ТАБЛИЦУ
-        const SHEET_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vQhlYU2RB6wpIzFS709BcVHZCEcRtL8ZIQjykgTiNOOBiynDuAfRoyo2t4F5aOE6-tQmVMhqlv2Lo8f/pub?gid=2078528736&single=true&output=csv';
         const SHEET_URL = 'https://corsproxy.io/?' + encodeURIComponent('https://docs.google.com/spreadsheets/d/e/2PACX-1vQhlYU2RB6wpIzFS709BcVHZCEcRtL8ZIQjykgTiNOOBiynDuAfRoyo2t4F5aOE6-tQmVMhqlv2Lo8f/pub?gid=2078528736&single=true&output=csv');
-        
-        // Цвета для команд (неоновые, чтобы было видно на темном фоне)
-        const teamColors = ['#ff0055', '#00ffaa', '#ffcc00', '#ff6600', '#aa00ff', '#00ccff'];
+
+        const teamColors = ['#ff0055', '#00ffaa', '#ffcc00', '#ff6600', '#aa00ff', '#00ccff', '#ff3399', '#33ff99'];
 
         Papa.parse(SHEET_URL, {
             download: true,
-            header: true,
+            header: false,
             complete: function(results) {
                 const data = results.data;
-                const rounds = data.map(row => row['Раунд']); // Убедись, что заголовок столбца точно "Раунд"
+                
+                // Первая строка = названия раундов (пропускаем первую пустую ячейку)
+                const rounds = data[0].slice(1).filter(r => r);
+                
+                // Первая колонка = названия команд (пропускаем первую строку с заголовками)
+                const teamNames = data.slice(1).map(row => row[0]).filter(t => t);
                 
                 const datasets = [];
-                const headers = Object.keys(data[0]);
-
-                // Проходимся по всем командам (столбцам)
-                headers.forEach((header, index) => {
-                    if (header !== 'Раунд') {
-                        datasets.push({
-                            label: header,
-                            data: data.map(row => row[header]),
-                            borderColor: teamColors[index % teamColors.length],
-                            backgroundColor: teamColors[index % teamColors.length],
-                            borderWidth: 3,
-                            tension: 0.3, // Делаем линии плавными, как дуги полёта
-                            pointStyle: '✈️', // Эмодзи самолётика вместо точек!
-                            pointRadius: 15,
-                            pointHoverRadius: 20
-                        });
-                    }
+                
+                // Для каждой команды создаём dataset
+                teamNames.forEach((teamName, teamIndex) => {
+                    const rowData = data[teamIndex + 1]; // +1 потому что первая строка - заголовки
+                    const points = rowData.slice(1).map(p => parseInt(p) || 0);
+                    
+                    datasets.push({
+                        label: teamName,
+                        data: points,
+                        borderColor: teamColors[teamIndex % teamColors.length],
+                        backgroundColor: teamColors[teamIndex % teamColors.length],
+                        borderWidth: 3,
+                        tension: 0.3,
+                        pointStyle: '✈️',
+                        pointRadius: 15,
+                        pointHoverRadius: 20
+                    });
                 });
 
-                // Рисуем график
                 const ctx = document.getElementById('flightRadar').getContext('2d');
                 new Chart(ctx, {
                     type: 'line',
-                    data: { labels: rounds, datasets: datasets },
+                    data: { 
+                        labels: rounds, 
+                        datasets: datasets 
+                    },
                     options: {
                         responsive: true,
                         maintainAspectRatio: false,
                         plugins: {
-                            legend: { labels: { color: '#fff', font: { size: 16 } } },
+                            legend: { 
+                                labels: { 
+                                    color: '#fff', 
+                                    font: { size: 14 } 
+                                } 
+                            },
                             tooltip: {
                                 callbacks: {
                                     label: function(context) {
@@ -100,11 +114,16 @@
                             y: { 
                                 title: { display: true, text: 'МИЛИ', color: '#39ff14' },
                                 ticks: { color: '#fff' },
-                                grid: { color: 'rgba(255,255,255,0.1)' }
+                                grid: { color: 'rgba(255,255,255,0.1)' },
+                                beginAtZero: true
                             }
                         }
                     }
                 });
+            },
+            error: function(error) {
+                console.error('Ошибка загрузки данных:', error);
+                alert('Не удалось загрузить данные с таблицы. Проверьте консоль (F12) для деталей.');
             }
         });
     </script>
