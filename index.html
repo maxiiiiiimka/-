@@ -4,14 +4,13 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Радар Политех Авиа ✈️</title>
-    <!-- Подключаем библиотеки с CDN -->
     <script src="https://cdn.jsdelivr.net/npm/papaparse@5.3.2/papaparse.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
         body {
-            background-color: #0b132b; /* Цвет ночного неба */
+            background-color: #0b132b;
             color: #c5c6c7;
-            font-family: 'Courier New', monospace; /* Шрифт как на табло */
+            font-family: 'Courier New', monospace;
             display: flex;
             flex-direction: column;
             align-items: center;
@@ -22,7 +21,27 @@
         h1 { 
             color: #39ff14; 
             text-shadow: 0 0 10px #39ff14;
-            margin-bottom: 20px;
+            margin-bottom: 10px;
+        }
+        .status {
+            color: #00ffaa;
+            font-size: 14px;
+            margin-bottom: 15px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .status-dot {
+            width: 10px;
+            height: 10px;
+            background-color: #39ff14;
+            border-radius: 50%;
+            animation: pulse 2s infinite;
+        }
+        @keyframes pulse {
+            0% { opacity: 1; box-shadow: 0 0 0 0 rgba(57, 255, 20, 0.7); }
+            70% { opacity: 0.7; box-shadow: 0 0 0 10px rgba(57, 255, 20, 0); }
+            100% { opacity: 1; box-shadow: 0 0 0 0 rgba(57, 255, 20, 0); }
         }
         .radar-container {
             width: 90%;
@@ -39,6 +58,10 @@
 <body>
 
     <h1>📡 РАДАР ДИСПЕТЧЕРСКОЙ ПОЛИТЕХ АВИА 📡</h1>
+    <div class="status">
+        <div class="status-dot"></div>
+        <span id="statusText">Подключение к радару...</span>
+    </div>
     <div class="radar-container">
         <canvas id="flightRadar"></canvas>
     </div>
@@ -47,103 +70,118 @@
         const SHEET_URL = 'https://corsproxy.io/?' + encodeURIComponent('https://docs.google.com/spreadsheets/d/e/2PACX-1vQhlYU2RB6wpIzFS709BcVHZCEcRtL8ZIQjykgTiNOOBiynDuAfRoyo2t4F5aOE6-tQmVMhqlv2Lo8f/pub?gid=2078528736&single=true&output=csv');
 
         const teamColors = ['#ff0055', '#00ffaa', '#ffcc00', '#ff6600', '#aa00ff', '#00ccff', '#ff3399', '#33ff99'];
+        
+        let chartInstance = null; // Храним ссылку на график
+        let lastUpdate = null;    // Время последнего обновления
 
-        Papa.parse(SHEET_URL, {
-            download: true,
-            header: false,
-            complete: function(results) {
-                const data = results.data;
-                
-                // Первая строка = названия раундов (пропускаем первую пустую ячейку)
-                const rounds = data[0].slice(1).filter(r => r);
-                
-                // Первая колонка = названия команд (пропускаем первую строку с заголовками)
-                const teamNames = data.slice(1).map(row => row[0]).filter(t => t);
-                
-                const datasets = [];
-                
-                // Для каждой команды создаём dataset
-                teamNames.forEach((teamName, teamIndex) => {
-                    const rowData = data[teamIndex + 1]; // +1 потому что первая строка - заголовки
-                    
-                    // Преобразуем данные: если FALSE — то null (линия прерывается)
-                    const points = rowData.slice(1).map(p => {
-                        // Проверяем на FALSE (может быть как строкой, так и булевым)
-                        if (p === 'FALSE' || p === false || p === 'false') {
-                            return null; // null = линия прерывается
-                        }
-                        // Если пустая ячейка или не число — тоже null
-                        if (p === '' || p === null || p === undefined) {
-                            return null;
-                        }
-                        // Иначе пытаемся распарсить число
-                        const num = parseInt(p);
-                        return isNaN(num) ? null : num;
-                    });
-                    
-                    datasets.push({
-                        label: teamName,
-                        data: points,
-                        borderColor: teamColors[teamIndex % teamColors.length],
-                        backgroundColor: teamColors[teamIndex % teamColors.length],
-                        borderWidth: 3,
-                        tension: 0.3, // Плавные линии
-                        pointStyle: '✈️',
-                        pointRadius: 15,
-                        pointHoverRadius: 20
-                        // spanGaps не указан = false по умолчанию, линия прерывается на null
-                    });
-                });
+        function loadRadarData() {
+            const statusText = document.getElementById('statusText');
+            statusText.textContent = 'Сканирование радаром...';
 
-                const ctx = document.getElementById('flightRadar').getContext('2d');
-                new Chart(ctx, {
-                    type: 'line',
-                    data: { 
-                        labels: rounds, 
-                        datasets: datasets 
-                    },
-                    options: {
-                        responsive: true,
-                        maintainAspectRatio: false,
-                        plugins: {
-                            legend: { 
-                                labels: { 
-                                    color: '#fff', 
-                                    font: { size: 14 } 
-                                } 
-                            },
-                            tooltip: {
-                                callbacks: {
-                                    label: function(context) {
-                                        if (context.parsed.y === null) {
-                                            return `${context.dataset.label}: раунд не проводился`;
+            Papa.parse(SHEET_URL, {
+                download: true,
+                header: false,
+                complete: function(results) {
+                    const data = results.data;
+                    
+                    const rounds = data[0].slice(1).filter(r => r);
+                    const teamNames = data.slice(1).map(row => row[0]).filter(t => t);
+                    
+                    const datasets = [];
+                    
+                    teamNames.forEach((teamName, teamIndex) => {
+                        const rowData = data[teamIndex + 1];
+                        
+                        const points = rowData.slice(1).map(p => {
+                            if (p === 'FALSE' || p === false || p === 'false') {
+                                return null;
+                            }
+                            if (p === '' || p === null || p === undefined) {
+                                return null;
+                            }
+                            const num = parseInt(p);
+                            return isNaN(num) ? null : num;
+                        });
+                        
+                        datasets.push({
+                            label: teamName,
+                            data: points,
+                            borderColor: teamColors[teamIndex % teamColors.length],
+                            backgroundColor: teamColors[teamIndex % teamColors.length],
+                            borderWidth: 3,
+                            tension: 0.3,
+                            pointStyle: '️',
+                            pointRadius: 15,
+                            pointHoverRadius: 20
+                        });
+                    });
+
+                    // Удаляем старый график перед отрисовкой нового
+                    if (chartInstance) {
+                        chartInstance.destroy();
+                    }
+
+                    const ctx = document.getElementById('flightRadar').getContext('2d');
+                    chartInstance = new Chart(ctx, {
+                        type: 'line',
+                        data: { 
+                            labels: rounds, 
+                            datasets: datasets 
+                        },
+                        options: {
+                            responsive: true,
+                            maintainAspectRatio: false,
+                            plugins: {
+                                legend: { 
+                                    labels: { 
+                                        color: '#fff', 
+                                        font: { size: 14 } 
+                                    } 
+                                },
+                                tooltip: {
+                                    callbacks: {
+                                        label: function(context) {
+                                            if (context.parsed.y === null) {
+                                                return `${context.dataset.label}: раунд не проводился`;
+                                            }
+                                            return `${context.dataset.label}: ${context.parsed.y} миль`;
                                         }
-                                        return `${context.dataset.label}: ${context.parsed.y} миль`;
                                     }
                                 }
-                            }
-                        },
-                        scales: {
-                            x: { 
-                                title: { display: true, text: 'ЭТАПЫ ПОЛЁТА', color: '#39ff14' },
-                                ticks: { color: '#fff' },
-                                grid: { color: 'rgba(255,255,255,0.1)' }
                             },
-                            y: { 
-                                title: { display: true, text: 'МИЛИ', color: '#39ff14' },
-                                ticks: { color: '#fff' },
-                                grid: { color: 'rgba(255,255,255,0.1)' },
-                                beginAtZero: true
+                            scales: {
+                                x: { 
+                                    title: { display: true, text: 'ЭТАПЫ ПОЛЁТА', color: '#39ff14' },
+                                    ticks: { color: '#fff' },
+                                    grid: { color: 'rgba(255,255,255,0.1)' }
+                                },
+                                y: { 
+                                    title: { display: true, text: 'МИЛИ', color: '#39ff14' },
+                                    ticks: { color: '#fff' },
+                                    grid: { color: 'rgba(255,255,255,0.1)' },
+                                    beginAtZero: true
+                                }
                             }
                         }
-                    }
-                });
-            },
-            error: function(error) {
-                console.error('Ошибка загрузки данных:', error);
-                alert('Не удалось загрузить данные с таблицы. Проверьте консоль (F12) для деталей.');
-            }
-        });
+                    });
+
+                    // Обновляем статус
+                    lastUpdate = new Date();
+                    const timeStr = lastUpdate.toLocaleTimeString('ru-RU');
+                    statusText.textContent = `Радар активен | Обновлено: ${timeStr} | Следующее сканирование через 30 сек`;
+                },
+                error: function(error) {
+                    console.error('Ошибка загрузки данных:', error);
+                    statusText.textContent = '⚠ Ошибка связи с радаром. Повтор через 30 сек...';
+                }
+            });
+        }
+
+        // Первый запуск
+        loadRadarData();
+
+        // Автообновление каждые 30 секунд
+        setInterval(loadRadarData, 30000);
     </script>
 </body>
 </html>
